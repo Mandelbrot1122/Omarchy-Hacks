@@ -79,6 +79,13 @@ local function sh_quote(value)
   return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
 end
 
+-- Menüs (wofi, rofi, fuzzel, ...) umschalten: nochmal drücken schließt sie,
+-- statt ein weiteres Menü zu öffnen.
+local function toggle_menu(command, program)
+  program = program or command:match("^%S+")
+  return "pkill -x " .. sh_quote(program) .. " || " .. command
+end
+
 local function webapp(url)
   return apps.webapp .. " " .. sh_quote(url)
 end
@@ -124,6 +131,8 @@ cmd.screenrecord = screenrecord("", "Bildschirmaufnahme")
 cmd.screenrecordAudio = screenrecord("--audio", "Bildschirmaufnahme (mit Ton)")
 
 cmd.ocr = [[sel=$(slurp -d) && grim -g "$sel" - | tesseract stdin stdout 2>/dev/null | wl-copy && notify-send "Text erkannt" "In die Zwischenablage kopiert"]]
+
+local menu_program = apps.dmenu:match("^%S+")
 
 cmd.clipboard = "cliphist list | " .. apps.dmenu .. " | cliphist decode | wl-copy"
 
@@ -256,10 +265,11 @@ end
 
 
 -- ----------------------------------------------------------------------------
---  Autostart (für Zwischenablage-Verlauf und Mediaplayer-Wechsel)
+--  Autostart (Leiste, Zwischenablage-Verlauf, Mediaplayer-Wechsel)
 -- ----------------------------------------------------------------------------
 section("Autostart", function()
   hl.on("hyprland.start", function()
+    hl.exec_cmd("pgrep -x waybar >/dev/null || waybar")
     hl.exec_cmd("wl-paste --watch cliphist store")
     hl.exec_cmd("playerctld daemon")
   end)
@@ -311,7 +321,7 @@ section("Zwischenablage", function()
   bind("SUPER + C", "Kopieren", send_shortcut("CTRL", "Insert"))
   bind("SUPER + V", "Einfügen", send_shortcut("SHIFT", "Insert"))
   bind("SUPER + X", "Ausschneiden", send_shortcut("CTRL", "X"))
-  bind("SUPER + CTRL + V", "Zwischenablage-Verlauf", cmd.clipboard)
+  bind("SUPER + CTRL + V", "Zwischenablage-Verlauf", toggle_menu(cmd.clipboard, menu_program))
 end)
 
 
@@ -441,11 +451,11 @@ end)
 --  Menüs und System
 -- ============================================================================
 section("System", function()
-  bind("SUPER + SPACE", "App-Starter", apps.launcher)
-  bind("SUPER + ALT + SPACE", "App-Starter", apps.launcher)
-  bind("SUPER + ESCAPE", "Systemmenü", cmd.power)
-  bind("XF86PowerOff", "Systemmenü", cmd.power, { locked = true })
-  bind("SUPER + K", "Tastenkürzel anzeigen", cmd.keybindings)
+  bind("SUPER + SPACE", "App-Starter", toggle_menu(apps.launcher))
+  bind("SUPER + ALT + SPACE", "App-Starter", toggle_menu(apps.launcher))
+  bind("SUPER + ESCAPE", "Systemmenü", toggle_menu(cmd.power, menu_program))
+  bind("XF86PowerOff", "Systemmenü", toggle_menu(cmd.power, menu_program), { locked = true })
+  bind("SUPER + K", "Tastenkürzel anzeigen", toggle_menu(cmd.keybindings, menu_program))
   bind("SUPER + CTRL + E", "Emojis", apps.emojiPicker)
   bind("SUPER + SHIFT + SPACE", "Leiste ein/aus (Waybar)", "pkill -SIGUSR1 waybar")
   bind("SUPER + CTRL + I", "Sperre bei Inaktivität umschalten", cmd.idle)

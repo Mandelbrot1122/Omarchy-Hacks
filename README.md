@@ -33,12 +33,16 @@ Das Skript
 3. bindet sie am Ende deiner Konfiguration ein, mit Sicherung als `.bak`:
    - Lua: `dofile("/home/…/.config/hypr/omarchy-keybindings.lua")`
    - conf: `source = /home/…/.config/hypr/omarchy-keybindings.conf`
-4. zeigt fehlende Abhängigkeiten an und lädt Hyprland neu.
+4. richtet die **Leiste oben** ein: Waybar im Stil von Omarchy (Arbeitsflächen, Uhr, Wetter,
+   Tray, Bluetooth, Netzwerk, Lautstärke, CPU, Akku). Eine vorhandene Waybar-Konfiguration
+   wird vorher als `~/.config/waybar.bak-…` gesichert,
+5. zeigt fehlende Abhängigkeiten an und lädt Hyprland neu.
 
 | Option | Wirkung |
 |---|---|
 | `--install-deps` | fehlende Pakete mit `pacman` installieren (Arch) |
 | `--no-detect` | Programme nicht erkennen, Standardwerte behalten |
+| `--no-waybar` | keine Waybar-Leiste einrichten |
 | `--uninstall` | source-Zeile entfernen, Datei als `.bak` zur Seite legen |
 
 Optionen beim Einzeiler: `curl -fsSL …/install.sh | bash -s -- --install-deps`
@@ -49,7 +53,8 @@ Arch:
 
 ```bash
 sudo pacman -S --needed jq wireplumber brightnessctl playerctl grim slurp wl-clipboard \
-  cliphist hyprpicker hyprlock hypridle wf-recorder tesseract tesseract-data-deu libnotify wofi
+  cliphist hyprpicker hyprlock hypridle wf-recorder tesseract tesseract-data-deu libnotify wofi \
+  waybar ttf-jetbrains-mono-nerd
 ```
 
 Dazu optional ein Terminal, Browser, Dateimanager usw. nach Wahl. Das Skript erkennt u. a.
@@ -81,7 +86,7 @@ Benachrichtigungen funktionieren mit **mako** oder **swaync**, die Leiste mit **
 
 ## Unterschiede zu Omarchy
 
-- **Menüs:** `SUPER + SPACE` öffnet den App-Starter, `SUPER + ESCAPE` ein einfaches Systemmenü
+- **Menüs:** `SUPER + SPACE` öffnet den App-Starter (nochmal drücken oder Escape schließt ihn), `SUPER + ESCAPE` ein einfaches Systemmenü
   (Sperren, Abmelden, Bereitschaft, Neustart, Herunterfahren).
 - **Arbeitsflächen** sind global (Hyprland-Standard), nicht pro Monitor 1–10 wie in Omarchy.
 - **`SUPER + L`** wechselt das Layout global zwischen *dwindle* und *master*.

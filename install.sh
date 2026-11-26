@@ -7,6 +7,7 @@
 # Optionen:
 #   --install-deps   fehlende Pakete installieren (nur Arch/pacman)
 #   --no-detect      Programme nicht automatisch erkennen, Standardwerte behalten
+#   --no-waybar      keine Waybar-Leiste (Omarchy-Stil) einrichten
 #   --uninstall      Keybindings wieder entfernen
 set -euo pipefail
 
@@ -33,11 +34,13 @@ FILE_NAME="omarchy-keybindings.$MODE"
 install_deps=false
 detect=true
 uninstall=false
+waybar=true
 for arg in "$@"; do
   case "$arg" in
     --install-deps) install_deps=true ;;
     --no-detect) detect=false ;;
     --uninstall) uninstall=true ;;
+    --no-waybar) waybar=false ;;
     -h | --help) sed -n '2,10p' "$0" 2>/dev/null || true; exit 0 ;;
     *) echo "Unbekannte Option: $arg" >&2; exit 1 ;;
   esac
@@ -153,6 +156,7 @@ if $detect; then
   else launcher="wofi --show drun"; dmenu="wofi --dmenu"; fi
   set_var launcher "$launcher"
   set_var dmenu "$dmenu"
+  [[ $MODE == conf ]] && set_var menuBin "${dmenu%% *}"
 
   emoji=$(first rofimoji bemoji smile || echo "notify-send 'Kein Emoji-Picker installiert' 'z. B. rofimoji oder bemoji installieren'")
   set_var emojiPicker "$emoji"
@@ -192,6 +196,55 @@ else
   info "$MAIN bindet die Datei bereits ein."
 fi
 
+# ---------------------------------------------------------------- Waybar-Leiste
+install_waybar() {
+  local dir="${XDG_CONFIG_HOME:-$HOME/.config}/waybar" f content value key
+  local -A values=(
+    [MENUBIN]="${dmenu:-wofi --dmenu}"
+    [LAUNCHER]="${launcher:-wofi --show drun}"
+    [TERMINAL]="${terminal:-kitty}"
+    [AUDIO]="${audio:-pavucontrol}"
+    [BLUETOOTH]="${bt:-blueman-manager}"
+    [NETWORK]="${net:-nm-connection-editor}"
+  )
+  values[MENUBIN]="${values[MENUBIN]%% *}"
+  shopt -u patsub_replacement 2>/dev/null || true
+
+  if [[ -f $dir/config.jsonc || -f $dir/config ]] && ! grep -qs "im Stil von Omarchy" "$dir/config.jsonc"; then
+    local backup="$dir.bak-$(date +%Y%m%d-%H%M%S)"
+    cp -r "$dir" "$backup"
+    info "Vorhandene Waybar-Konfiguration gesichert: $backup"
+    rm -f "$dir/config"
+  fi
+  mkdir -p "$dir"
+
+  for f in config.jsonc style.css; do
+    if [[ -n $script_dir && -f $script_dir/waybar/$f ]]; then
+      content=$(<"$script_dir/waybar/$f")
+    elif have curl; then
+      content=$(curl -fsSL "$RAW_BASE/waybar/$f")
+    else
+      content=$(wget -qO- "$RAW_BASE/waybar/$f")
+    fi
+    for key in "${!values[@]}"; do
+      value=${values[$key]//\\/\\\\}
+      value=${value//\"/\\\"}
+      content=${content//@$key@/$value}
+    done
+    printf '%s\n' "$content" >"$dir/$f"
+  done
+  info "Waybar-Leiste installiert: $dir"
+
+  if [[ -n ${HYPRLAND_INSTANCE_SIGNATURE:-} ]] && have waybar; then
+    if pgrep -x waybar >/dev/null; then
+      pkill -SIGUSR2 -x waybar || true
+    else
+      setsid -f waybar >/dev/null 2>&1 || true
+    fi
+  fi
+}
+$waybar && install_waybar
+
 # ---------------------------------------------------------------- Abhängigkeiten
 # Befehl -> Arch-Paket
 declare -A pkgs=(
@@ -205,6 +258,10 @@ missing_cmds=() missing_pkgs=()
 for cmd in "${!pkgs[@]}"; do
   have "$cmd" || { missing_cmds+=("$cmd"); missing_pkgs+=("${pkgs[$cmd]}"); }
 done
+if $waybar && ! have waybar; then missing_cmds+=(waybar); missing_pkgs+=(waybar); fi
+if $waybar && have fc-list && ! fc-list | grep -qi "Nerd Font"; then
+  missing_cmds+=("Nerd Font"); missing_pkgs+=(ttf-jetbrains-mono-nerd)
+fi
 if $detect && ! have "${dmenu%% *}"; then
   missing_cmds+=("${dmenu%% *}"); missing_pkgs+=("${dmenu%% *}")
 fi
