@@ -1,7 +1,12 @@
 # Omarchy-Keybindings für normales Hyprland
 
-Alle Tastenkürzel von [Omarchy](https://github.com/basecamp/omarchy) in **einer Datei**
-([`omarchy-keybindings.conf`](omarchy-keybindings.conf)) für jedes normale Hyprland,
+Alle Tastenkürzel von [Omarchy](https://github.com/basecamp/omarchy) in **einer Datei** für jedes
+normale Hyprland, in zwei Varianten:
+
+- [`omarchy-keybindings.lua`](omarchy-keybindings.lua) für Hyprland mit **`hyprland.lua`**
+- [`omarchy-keybindings.conf`](omarchy-keybindings.conf) für das klassische **`hyprland.conf`**
+
+Beide Varianten sind
 ohne Omarchy selbst. Statt der `omarchy-*`-Skripte nutzt sie Standard-Tools
 (wpctl, brightnessctl, playerctl, grim/slurp, hyprlock, cliphist, …).
 
@@ -21,11 +26,13 @@ cd omarchy-hacks
 
 Das Skript
 
-1. kopiert `omarchy-keybindings.conf` nach `~/.config/hypr/`,
+1. erkennt, ob du `hyprland.lua` oder `hyprland.conf` nutzt, und kopiert die passende Datei
+   nach `~/.config/hypr/`,
 2. erkennt deine installierten Programme (Terminal, Browser, Dateimanager, Launcher, …)
    und trägt sie oben in der Datei ein,
-3. hängt `source = ~/.config/hypr/omarchy-keybindings.conf` ans Ende deiner `hyprland.conf`
-   (mit Sicherung als `hyprland.conf.bak`),
+3. bindet sie am Ende deiner Konfiguration ein, mit Sicherung als `.bak`:
+   - Lua: `dofile("/home/…/.config/hypr/omarchy-keybindings.lua")`
+   - conf: `source = /home/…/.config/hypr/omarchy-keybindings.conf`
 4. zeigt fehlende Abhängigkeiten an und lädt Hyprland neu.
 
 | Option | Wirkung |
@@ -52,16 +59,24 @@ Benachrichtigungen funktionieren mit **mako** oder **swaync**, die Leiste mit **
 
 ## Anpassen
 
-- **Programme:** Oben in `~/.config/hypr/omarchy-keybindings.conf` stehen Variablen wie
-  `$terminal`, `$browser`, `$launcher`. Dort ändern.
-- **Eigene Bindings / Bindings überschreiben:** in `hyprland.conf` **nach** der `source`-Zeile, z. B.
+- **Programme:** Oben in der installierten Datei stehen `terminal`, `browser`, `launcher` usw.
+  (Lua: Tabelle `apps`, conf: Variablen `$terminal`, …). Dort ändern.
+- **Eigene Bindings / Bindings überschreiben:** **nach** der Einbindungszeile, z. B.
+  ```lua
+  -- hyprland.lua
+  hl.unbind("SUPER + Q")
+  hl.bind("SUPER + Q", hl.dsp.exec_cmd("kitty"), { description = "Terminal" })
+  ```
   ```ini
+  # hyprland.conf
   unbind = SUPER, Q
   bind = SUPER, Q, exec, kitty
   ```
-- Die Datei entfernt zu Beginn alle vorher definierten Bindings auf den Tasten, die sie selbst
-  belegt (z. B. `SUPER + M = exit` aus der Hyprland-Standardconfig). Wer Bindings in der Datei
-  ändert, erzeugt diesen Block mit `tools/update-unbinds.sh` neu.
+- Beide Varianten entfernen vorher definierte Bindings auf den Tasten, die sie selbst belegen
+  (z. B. `SUPER + M = exit` aus der Hyprland-Standardconfig). In der conf-Variante steht dafür
+  ein `unbind`-Block, den `tools/update-unbinds.sh` nach Änderungen neu erzeugt.
+- Lua-Variante: Schlägt ein Abschnitt fehl (z. B. nach einer API-Änderung in Hyprland), laufen
+  die anderen weiter, und eine Benachrichtigung nennt den Fehler.
 - Alle aktiven Tastenkürzel anzeigen: **`SUPER + K`**.
 
 ## Unterschiede zu Omarchy
@@ -76,8 +91,6 @@ Benachrichtigungen funktionieren mit **mako** oder **swaync**, die Leiste mit **
   (`SUPER + Home`), Monitor-Skalierung (`SUPER + /`), Herdr, Omawrite, cliamp, Tastatur-
   beleuchtung durchschalten, Touchpad-Tasten, Audioausgang wechseln, Laptop-Spiegelung,
   Deckel-Schalter (übernimmt systemd-logind), JIS- und Eingabemethoden-Sonderbelegungen.
-- Hyprland mit **Lua-Konfiguration** (`hyprland.lua`): Die Datei ist im klassischen
-  hyprlang-Format. Das Skript warnt in diesem Fall und trägt nichts ein.
 
 Stand: Omarchy-Bindings vom 25.11.2026 (`basecamp/omarchy@3b1a913`).
 

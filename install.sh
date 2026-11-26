@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Installiert die Omarchy-Keybindings in ein normales Hyprland.
+# Installiert die Omarchy-Keybindings in ein normales Hyprland
+# (hyprland.lua -> omarchy-keybindings.lua, sonst omarchy-keybindings.conf).
 #
 #   curl -fsSL https://raw.githubusercontent.com/mandelbrot1122/omarchy-hacks/HEAD/install.sh | bash
 #
@@ -10,11 +11,24 @@
 set -euo pipefail
 
 REPO="mandelbrot1122/omarchy-hacks"
-RAW_URL="https://raw.githubusercontent.com/$REPO/HEAD/omarchy-keybindings.conf"
+RAW_BASE="https://raw.githubusercontent.com/$REPO/HEAD"
 HYPR_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr"
-TARGET="$HYPR_DIR/omarchy-keybindings.conf"
-MAIN="$HYPR_DIR/hyprland.conf"
-MARKER="# omarchy-keybindings"
+
+# Hyprland mit hyprland.lua bekommt die Lua-Version, sonst die .conf-Version.
+if [[ -f $HYPR_DIR/hyprland.lua ]]; then
+  MODE=lua
+  TARGET="$HYPR_DIR/omarchy-keybindings.lua"
+  MAIN="$HYPR_DIR/hyprland.lua"
+  MARKER="-- omarchy-keybindings"
+  INCLUDE="dofile(\"$TARGET\")"
+else
+  MODE=conf
+  TARGET="$HYPR_DIR/omarchy-keybindings.conf"
+  MAIN="$HYPR_DIR/hyprland.conf"
+  MARKER="# omarchy-keybindings"
+  INCLUDE="source = $TARGET"
+fi
+FILE_NAME="omarchy-keybindings.$MODE"
 
 install_deps=false
 detect=true
@@ -49,8 +63,8 @@ reload_hyprland() {
 if $uninstall; then
   if [[ -f $MAIN ]]; then
     cp "$MAIN" "$MAIN.bak"
-    grep -vF -e "$MARKER" -e "source = $TARGET" "$MAIN.bak" >"$MAIN" || true
-    info "source-Zeile aus $MAIN entfernt (Sicherung: $MAIN.bak)."
+    grep -vF -e "$MARKER" -e "$INCLUDE" "$MAIN.bak" >"$MAIN" || true
+    info "Einbindung aus $MAIN entfernt (Sicherung: $MAIN.bak)."
   fi
   if [[ -f $TARGET ]]; then
     mv "$TARGET" "$TARGET.bak"
@@ -66,24 +80,36 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || echo 
 tmp=$(mktemp)
 trap 'rm -f "$tmp"' EXIT
 
-if [[ -n $script_dir && -f $script_dir/omarchy-keybindings.conf ]]; then
-  cp "$script_dir/omarchy-keybindings.conf" "$tmp"
-  info "Verwende lokale Datei aus $script_dir."
+info "Hyprland-Konfiguration: $MAIN ($MODE)"
+if [[ -n $script_dir && -f $script_dir/$FILE_NAME ]]; then
+  cp "$script_dir/$FILE_NAME" "$tmp"
+  info "Verwende lokale Datei $script_dir/$FILE_NAME."
 elif have curl; then
-  curl -fsSL "$RAW_URL" -o "$tmp"
+  curl -fsSL "$RAW_BASE/$FILE_NAME" -o "$tmp"
 elif have wget; then
-  wget -qO "$tmp" "$RAW_URL"
+  wget -qO "$tmp" "$RAW_BASE/$FILE_NAME"
 else
   warn "Weder curl noch wget gefunden."; exit 1
 fi
 
-grep -q '^bindd' "$tmp" || { warn "Heruntergeladene Datei sieht falsch aus."; exit 1; }
+if [[ $MODE == lua ]]; then
+  grep -q '^local function bind' "$tmp"
+else
+  grep -q '^bindd' "$tmp"
+fi || { warn "Heruntergeladene Datei sieht falsch aus."; exit 1; }
 
 # ---------------------------------------------------------------- Programme erkennen
 set_var() { # set_var name wert
-  awk -v name="$1" -v value="$2" '
-    index($0, "$" name " = ") == 1 { print "$" name " = " value; next }
-    { print }' "$tmp" >"$tmp.new" && mv "$tmp.new" "$tmp"
+  if [[ $MODE == lua ]]; then
+    awk -v name="$1" -v value="$2" '
+      index($0, "  " name " = [[") == 1 { print "  " name " = [[" value "]],"; next }
+      { print }' "$tmp" >"$tmp.new"
+  else
+    awk -v name="$1" -v value="$2" '
+      index($0, "$" name " = ") == 1 { print "$" name " = " value; next }
+      { print }' "$tmp" >"$tmp.new"
+  fi
+  mv "$tmp.new" "$tmp"
   printf '   %-18s %s\n' "\$$1" "$2"
 }
 first() { for c in "$@"; do have "${c%% *}" && { echo "$c"; return; }; done; return 1; }
@@ -158,14 +184,10 @@ fi
 cp "$tmp" "$TARGET"
 info "Installiert: $TARGET"
 
-if [[ ! -f $MAIN && -f $HYPR_DIR/hyprland.lua ]]; then
-  warn "Du nutzt eine Lua-Konfiguration ($HYPR_DIR/hyprland.lua)."
-  warn "Diese Datei ist im klassischen hyprlang-Format. Binde sie dort ein,"
-  warn "wo deine Lua-Konfig .conf-Dateien lädt, oder nutze eine hyprland.conf."
-elif ! grep -qF "source = $TARGET" "$MAIN" 2>/dev/null; then
+if ! grep -qF "$INCLUDE" "$MAIN" 2>/dev/null; then
   [[ -f $MAIN ]] && cp "$MAIN" "$MAIN.bak"
-  printf '\n%s (https://github.com/%s)\nsource = %s\n' "$MARKER" "$REPO" "$TARGET" >>"$MAIN"
-  info "source-Zeile am Ende von $MAIN ergänzt."
+  printf '\n%s (https://github.com/%s)\n%s\n' "$MARKER" "$REPO" "$INCLUDE" >>"$MAIN"
+  info "Am Ende von $MAIN eingebunden: $INCLUDE"
 else
   info "$MAIN bindet die Datei bereits ein."
 fi
